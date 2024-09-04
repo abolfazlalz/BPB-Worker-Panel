@@ -19,7 +19,7 @@ let proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];
 
 let dohURL = 'https://cloudflare-dns.com/dns-query';
 
-let panelVersion = '2.4.7';
+let panelVersion = '2.5';
 
 if (!isValidUUID(userID)) {
     throw new Error('uuid is not valid');
@@ -65,8 +65,12 @@ export default {
                         if (request.method === 'POST' && request.headers.get('content-type') === 'application/json') {
                             try {
                                 const warpKeys = await request.json();
-                                await fetchWgConfig(env, warpKeys);
-                                return new Response('Warp configs updated successfully', { status: 200 });
+                                const warpPlusError = await fetchWgConfig(env, warpKeys);
+                                if (warpPlusError) {
+                                    return new Response(warpPlusError, { status: 400 });
+                                } else {
+                                    return new Response('Warp configs updated successfully', { status: 200 });
+                                }
                             } catch (error) {
                                 console.log(error);
                                 return new Response(`An error occurred while updating Warp configs! - ${error}`, { status: 500 });
@@ -1026,6 +1030,7 @@ const getFragmentConfigs = async (env, hostName, client) => {
         lengthMax,
         intervalMin,
         intervalMax,
+        fragmentPackets,
         blockAds,
         bypassIran,
         blockPorn,
@@ -1083,6 +1088,8 @@ const getFragmentConfigs = async (env, hostName, client) => {
             fragConfig.outbounds[0].settings.fragment.length = `${lengthMin}-${lengthMax}`;
             fragConfig.outbounds[0].settings.fragment.interval = `${intervalMin}-${intervalMax}`;
 
+            fragConfig.outbounds[0].settings.fragment.packets = fragmentPackets;
+
             if (proxyOutbound) {
                 fragConfig.outbounds = [{ ...proxyOutbound }, { ...outbound }, ...fragConfig.outbounds];
                 fragConfig.routing.rules = buildRoutingRules(localDNS, blockAds, bypassIran, blockPorn, bypassLAN, true, false);
@@ -1125,6 +1132,7 @@ const getFragmentConfigs = async (env, hostName, client) => {
     bestPing.dns = await buildDNSObject(remoteDNS, localDNS, blockAds, bypassIran, blockPorn);
     bestPing.outbounds[0].settings.fragment.length = `${lengthMin}-${lengthMax}`;
     bestPing.outbounds[0].settings.fragment.interval = `${intervalMin}-${intervalMax}`;
+    bestPing.outbounds[0].settings.fragment.packets = fragmentPackets;
     bestPing.outbounds = [...outbounds, ...bestPing.outbounds];
 
     if (proxyOutbound) {
@@ -1151,7 +1159,7 @@ const getFragmentConfigs = async (env, hostName, client) => {
             protocol: "freedom",
             settings: {
                 fragment: {
-                    packets: "tlshello",
+                    packets: fragmentPackets,
                     length: fragLength,
                     interval: "1-1"
                 }
@@ -1268,11 +1276,11 @@ const getWarpConfigs = async (env, client) => {
     }
 
     const { remoteDNS, localDNS, blockAds, bypassIran, blockPorn, bypassLAN, wowEndpoint, warpEndpoints } = proxySettings;
-    const { xray: xrayWarpOutbounds, singbox: singboxWarpOutbounds } = await buildWarpOutbounds(env, remoteDNS, localDNS, blockAds, bypassIran, blockPorn, bypassLAN, warpEndpoints)
-    const { xray: xrayWoWOutbounds, singbox: singboxWoWOutbounds } = await buildWoWOutbounds(env, remoteDNS, localDNS, blockAds, bypassIran, blockPorn, bypassLAN, wowEndpoint);
+    const { xray: xrayWarpOutbounds, singbox: singboxWarpOutbounds } = await buildWarpOutbounds(env, client, remoteDNS, localDNS, blockAds, bypassIran, blockPorn, bypassLAN, warpEndpoints)
+    const { xray: xrayWoWOutbounds, singbox: singboxWoWOutbounds } = await buildWoWOutbounds(env, client, remoteDNS, localDNS, blockAds, bypassIran, blockPorn, bypassLAN, wowEndpoint);
 
-    singboxWarpConfig.outbounds[0].outbounds = ['🍯 Warp Best Ping 🚀'];
-    singboxWarpConfig.outbounds[1].tag = '🍯 Warp Best Ping 🚀';
+    singboxWarpConfig.outbounds[0].outbounds = ['💦 Warp Best Ping 🚀'];
+    singboxWarpConfig.outbounds[1].tag = '💦 Warp Best Ping 🚀';
     xrayWarpConfig.dns = await buildDNSObject(remoteDNS, localDNS, blockAds, bypassIran, blockPorn);
     xrayWarpConfig.routing.rules = buildRoutingRules(localDNS, blockAds, bypassIran, blockPorn, bypassLAN, false, false);
     xrayWarpConfig.outbounds.splice(0, 1);
@@ -1331,11 +1339,14 @@ const getWarpConfigs = async (env, client) => {
 
     return client === 'singbox'
         ? singboxWarpConfig
+    return client === 'singbox' || client === 'hiddify'
+        ? singboxWarpConfig
         : xrayWarpConfigs;
 }
 
-const buildWarpOutbounds = async (env, remoteDNS, localDNS, blockAds, bypassIran, blockPorn, bypassLAN, warpEndpoints) => {
+const buildWarpOutbounds = async (env, client, remoteDNS, localDNS, blockAds, bypassIran, blockPorn, bypassLAN, warpEndpoints) => {
     let warpConfigs = [];
+    let proxySettings = {};
     let xrayOutboundTemp = structuredClone(xrayWgOutboundTemp);
     let singboxOutbound = structuredClone(singboxWgOutboundTemp);
     let xrayOutbounds = [];
@@ -1344,7 +1355,8 @@ const buildWarpOutbounds = async (env, remoteDNS, localDNS, blockAds, bypassIran
     const portRegex = /[^:]*$/;
 
     try {
-        warpConfigs = await env.asali.get('warpConfigs', { type: 'json' });
+        warpConfigs = await env.bpb.get('warpConfigs', { type: 'json' });
+        proxySettings = await env.bpb.get('proxySettings', { type: 'json' });
     } catch (error) {
         console.log(error);
         throw new Error(`An error occurred while getting warp configs - ${error}`);
@@ -1358,6 +1370,15 @@ const buildWarpOutbounds = async (env, remoteDNS, localDNS, blockAds, bypassIran
     xrayOutboundTemp.settings.peers[0].publicKey = warpConfigs[0].account.config.peers[0].public_key;
     xrayOutboundTemp.settings.reserved = base64ToDecimal(warpConfigs[0].account.config.client_id);
     xrayOutboundTemp.settings.secretKey = warpConfigs[0].privateKey;
+
+    if (client === 'nikang') xrayOutboundTemp.settings = {
+        ...xrayOutboundTemp.settings,
+        wnoise: proxySettings.nikaNGNoiseMode,
+        wnoisecount: `${proxySettings.noiseCountMin}-${proxySettings.noiseCountMax}`,
+        wpayloadsize: `${proxySettings.noiseSizeMin}-${proxySettings.noiseSizeMax}`,
+        wnoisedelay: `${proxySettings.noiseDelayMin}-${proxySettings.noiseDelayMax}`
+    };
+
     delete xrayOutboundTemp.streamSettings;
 
     singboxOutbound.local_address = [
@@ -1368,6 +1389,15 @@ const buildWarpOutbounds = async (env, remoteDNS, localDNS, blockAds, bypassIran
     singboxOutbound.peer_public_key = warpConfigs[0].account.config.peers[0].public_key;
     singboxOutbound.reserved = warpConfigs[0].account.config.client_id;
     singboxOutbound.private_key = warpConfigs[0].privateKey;
+
+    if (client === 'hiddify') singboxOutbound = {
+        ...singboxOutbound,
+        fake_packets_mode: proxySettings.hiddifyNoiseMode,
+        fake_packets: `${proxySettings.noiseCountMin}-${proxySettings.noiseCountMax}`,
+        fake_packets_size: `${proxySettings.noiseSizeMin}-${proxySettings.noiseSizeMax}`,
+        fake_packets_delay: `${proxySettings.noiseDelayMin}-${proxySettings.noiseDelayMax}`
+    };
+
     delete singboxOutbound.detour;
 
     warpEndpoints.split(',').forEach((endpoint, index) => {
@@ -1387,15 +1417,17 @@ const buildWarpOutbounds = async (env, remoteDNS, localDNS, blockAds, bypassIran
     return { xray: xrayOutbounds, singbox: singboxOutbounds };
 }
 
-const buildWoWOutbounds = async (env, remoteDNS, localDNS, blockAds, bypassIran, blockPorn, bypassLAN, wowEndpoint) => {
+const buildWoWOutbounds = async (env, client, remoteDNS, localDNS, blockAds, bypassIran, blockPorn, bypassLAN, wowEndpoint) => {
     let warpConfigs = [];
+    let proxySettings = {};
     let xrayOutbounds = [];
     let singboxOutbounds = [];
     const ipv6Regex = /\[(.*?)\]/;
     const portRegex = /[^:]*$/;
 
     try {
-        warpConfigs = await env.asali.get('warpConfigs', { type: 'json' });
+        warpConfigs = await env.bpb.get('warpConfigs', { type: 'json' });
+        proxySettings = await env.bpb.get('proxySettings', { type: 'json' });
     } catch (error) {
         console.log(error);
         throw new Error(`An error occurred while getting warp configs - ${error}`);
@@ -1417,6 +1449,17 @@ const buildWoWOutbounds = async (env, remoteDNS, localDNS, blockAds, bypassIran,
             xrayOutbound.settings.secretKey = warpConfigs[i].privateKey;
             xrayOutbound.tag = i === 1 ? `warp-ir_${index + 1}` : `warp-out_${index + 1}`;
 
+
+            if (client === 'nikang' && i === 1) xrayOutbound.settings = {
+                ...xrayOutbound.settings,
+                wnoise: proxySettings.nikaNGNoiseMode,
+                wnoisecount: `${proxySettings.noiseCountMin}-${proxySettings.noiseCountMax}`,
+                wpayloadsize: `${proxySettings.noiseSizeMin}-${proxySettings.noiseSizeMax}`,
+                wnoisedelay: `${proxySettings.noiseDelayMin}-${proxySettings.noiseDelayMax}`
+            };
+
+            xrayOutbound.tag = i === 1 ? `warp-ir_${index + 1}` : `warp-out_${index + 1}`;
+
             if (i === 1) {
                 delete xrayOutbound.streamSettings;
             } else {
@@ -1435,7 +1478,16 @@ const buildWoWOutbounds = async (env, remoteDNS, localDNS, blockAds, bypassIran,
             singboxOutbound.peer_public_key = warpConfigs[i].account.config.peers[0].public_key;
             singboxOutbound.reserved = warpConfigs[i].account.config.client_id;
             singboxOutbound.private_key = warpConfigs[i].privateKey;
-            singboxOutbound.tag = i === 1 ? `warp-ir_${index + 1}` : `🍯 WoW ${index + 1} 🌍`;
+
+            if (client === 'hiddify' && i === 1) singboxOutbound = {
+                ...singboxOutbound,
+                fake_packets_mode: proxySettings.hiddifyNoiseMode,
+                fake_packets: `${proxySettings.noiseCountMin}-${proxySettings.noiseCountMax}`,
+                fake_packets_size: `${proxySettings.noiseSizeMin}-${proxySettings.noiseSizeMax}`,
+                fake_packets_delay: `${proxySettings.noiseDelayMin}-${proxySettings.noiseDelayMax}`
+            };
+
+            singboxOutbound.tag = i === 1 ? `warp-ir_${index + 1}` : `💦 WoW ${index + 1} 🌍`;
 
             if (i === 0) {
                 singboxOutbound.detour = `warp-ir_${index + 1}`;
@@ -1453,34 +1505,72 @@ const buildWoWOutbounds = async (env, remoteDNS, localDNS, blockAds, bypassIran,
 
 const fetchWgConfig = async (env, warpKeys) => {
     let warpConfigs = [];
+    let proxySettings = {};
+    const apiBaseUrl = 'https://api.cloudflareclient.com/v0a4005/reg';
+
+    try {
+        proxySettings = await env.bpb.get('proxySettings', { type: 'json' });
+    } catch (error) {
+        console.log(error);
+        throw new Error(`An error occurred while getting warp configs - ${error}`);
+    }
+
+    const { warpPlusLicense } = proxySettings;
 
     for (let i = 0; i < 2; i++) {
         const accountResponse = await fetch('https://api.cloudflareclient.com/v0a4005/reg', {
-            method: 'POST',
-            headers: {
-                'User-Agent': 'insomnia/8.6.1',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                key: warpKeys[i].publicKey,
-                install_id: "",
-                fcm_token: "",
-                tos: new Date().toISOString(),
-                type: "Android",
-                model: 'PC',
-                locale: 'en_US',
-                warp_enabled: true
-            })
-        });
+            for(let i = 0; i< 2; i++) {
+                const accountResponse = await fetch(apiBaseUrl, {
+                    method: 'POST',
+                    headers: {
+                        'User-Agent': 'insomnia/8.6.1',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        key: warpKeys[i].publicKey,
+                        install_id: "",
+                        fcm_token: "",
+                        tos: new Date().toISOString(),
+                        type: "Android",
+                        model: 'PC',
+                        locale: 'en_US',
+                        warp_enabled: true
+                    })
+                });
 
         const accountData = await accountResponse.json();
         warpConfigs.push({
             privateKey: warpKeys[i].privateKey,
             account: accountData
         });
+
+        if (warpPlusLicense) {
+            const response = await fetch(`${apiBaseUrl}/${accountData.id}/account`, {
+                method: 'PUT',
+                headers: {
+                    'User-Agent': 'insomnia/8.6.1',
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accountData.token}`
+                },
+                body: JSON.stringify({
+                    key: warpKeys[i].publicKey,
+                    install_id: "",
+                    fcm_token: "",
+                    tos: new Date().toISOString(),
+                    type: "Android",
+                    model: 'PC',
+                    locale: 'en_US',
+                    warp_enabled: true,
+                    license: warpPlusLicense
+                })
+            });
+
+            const responseData = await response.json();
+            if (response.status !== 200 && !responseData.success) return responseData.errors[0]?.message;
+        }
     }
 
-    await env.asali.put('warpConfigs', JSON.stringify(warpConfigs));
+    await env.bpb.put('warpConfigs', JSON.stringify(warpConfigs));
 }
 
 const buildDNSObject = async (remoteDNS, localDNS, blockAds, bypassIran, blockPorn, isWorkerLess) => {
@@ -1623,6 +1713,7 @@ const updateDataset = async (env, Settings) => {
         lengthMax: Settings ? Settings.get('fragmentLengthMax') : currentProxySettings?.lengthMax || '200',
         intervalMin: Settings ? Settings.get('fragmentIntervalMin') : currentProxySettings?.intervalMin || '5',
         intervalMax: Settings ? Settings.get('fragmentIntervalMax') : currentProxySettings?.intervalMax || '10',
+        fragmentPackets: Settings ? Settings.get('fragmentPackets') : currentProxySettings?.fragmentPackets || 'tlshello',
         blockAds: Settings ? Settings.get('block-ads') : currentProxySettings?.blockAds || false,
         bypassIran: Settings ? Settings.get('bypass-iran') : currentProxySettings?.bypassIran || false,
         blockPorn: Settings ? Settings.get('block-porn') : currentProxySettings?.blockPorn || false,
@@ -1634,6 +1725,15 @@ const updateDataset = async (env, Settings) => {
         outProxyParams: vlessConfig ? await extractVlessParams(vlessConfig) : currentProxySettings?.outProxyParams || '',
         wowEndpoint: Settings ? Settings.get('wowEndpoint')?.replaceAll(' ', '') : currentProxySettings?.wowEndpoint || 'engage.cloudflareclient.com:2408',
         warpEndpoints: Settings ? Settings.get('warpEndpoints')?.replaceAll(' ', '') : currentProxySettings?.warpEndpoints || 'engage.cloudflareclient.com:2408',
+        hiddifyNoiseMode: Settings ? Settings.get('hiddifyNoiseMode') : currentProxySettings?.hiddifyNoiseMode || 'm4',
+        nikaNGNoiseMode: Settings ? Settings.get('nikaNGNoiseMode') : currentProxySettings?.nikaNGNoiseMode || 'quic',
+        noiseCountMin: Settings ? Settings.get('noiseCountMin') : currentProxySettings?.noiseCountMin || '10',
+        noiseCountMax: Settings ? Settings.get('noiseCountMax') : currentProxySettings?.noiseCountMax || '15',
+        noiseSizeMin: Settings ? Settings.get('noiseSizeMin') : currentProxySettings?.noiseSizeMin || '5',
+        noiseSizeMax: Settings ? Settings.get('noiseSizeMax') : currentProxySettings?.noiseSizeMax || '10',
+        noiseDelayMin: Settings ? Settings.get('noiseDelayMin') : currentProxySettings?.noiseDelayMin || '1',
+        noiseDelayMax: Settings ? Settings.get('noiseDelayMax') : currentProxySettings?.noiseDelayMax || '1',
+        warpPlusLicense: Settings ? Settings.get('warpPlusLicense') : currentProxySettings?.warpPlusLicense || '',
         panelVersion: panelVersion
     };
 
@@ -1769,6 +1869,14 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
         intervalMin,
         intervalMax,
         blockAds,
+        remoteDNS,
+        localDNS,
+        lengthMin,
+        lengthMax,
+        intervalMin,
+        intervalMax,
+        fragmentPackets,
+        blockAds,
         bypassIran,
         blockPorn,
         bypassLAN,
@@ -1777,11 +1885,21 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
         outProxy,
         ports,
         wowEndpoint,
-        warpEndpoints
+        warpEndpoints,
+        hiddifyNoiseMode,
+        nikaNGNoiseMode,
+        noiseCountMin,
+        noiseCountMax,
+        noiseSizeMin,
+        noiseSizeMax,
+        noiseDelayMin,
+        noiseDelayMax,
+        warpPlusLicense
     } = proxySettings;
 
     const isWarpReady = warpConfigs ? true : false;
     const isPassSet = password ? password.length >= 8 : false;
+    const isWarpPlus = warpPlusLicense ? true : false;
     const genCustomConfRow = async (configs) => {
         let tableBlock = "";
         configs.forEach(config => {
@@ -2081,11 +2199,23 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
     						value="${intervalMax}" max="30" required>
 					</div>
 				</div>
+                <div class="form-control">
+                    <label for="fragmentPackets">📦 Fragment Packets</label>
+                    <div class="input-with-select">
+                        <select id="fragmentPackets" name="fragmentPackets">
+                            <option value="tlshello" ${fragmentPackets === 'tlshello' ? 'selected' : ''}>tlshello</option>
+                            <option value="1-1" ${fragmentPackets === '1-1' ? 'selected' : ''}>1-1</option>
+                            <option value="1-2" ${fragmentPackets === '1-2' ? 'selected' : ''}>1-2</option>
+                            <option value="1-3" ${fragmentPackets === '1-3' ? 'selected' : ''}>1-3</option>
+                            <option value="1-5" ${fragmentPackets === '1-5' ? 'selected' : ''}>1-5</option>
+                        </select>
+                    </div>
+                </div>
 				<div class="form-control">
 					<label for="outProxy">✈️ Chain Proxy</label>
 					<input type="text" id="outProxy" name="outProxy" value="${outProxy}">
 				</div>
-                <h2>FRAGMENT ROUTING ⚙️</h2>
+                <h2>FRAG/WARP ROUTING ⚙️</h2>
 				<div class="form-control" style="margin-bottom: 20px;">			
                     <div class="routing">
                         <input type="checkbox" id="block-ads" name="block-ads" style="margin: 0; grid-column: 2;" value="true" ${blockAds ? 'checked' : ''}>
@@ -2149,10 +2279,16 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                     <label for="warpEndpoints">✨ Warp Endpoints</label>
                     <input type="text" id="warpEndpoints" name="warpEndpoints" value="${warpEndpoints.replaceAll(",", " , ")}" required>
 				</div>
+				<div class="form-control">
+                    <label for="warpPlusLicense">➕ Warp+ License</label>
+                    <input type="text" id="warpPlusLicense" name="warpPlusLicense" value="${warpPlusLicense}" 
+                        pattern="^[a-zA-Z0-9]{8}-[a-zA-Z0-9]{8}-[a-zA-Z0-9]{8}$" 
+                        title="Please enter a valid Warp Plus license in xxxxxxxx-xxxxxxxx-xxxxxxxx format">
+				</div>
                 <div class="form-control">
-                    <label>🔄 Warp Configs</label>
+                    <label>♻️ Warp Configs</label>
                     <button id="refreshBtn" type="button" class="button" style="padding: 10px 0;" onclick="getWarpConfigs()">
-                        Refresh<span class="material-symbols-outlined">autorenew</span>
+                        Update<span class="material-symbols-outlined">autorenew</span>
                     </button>
                 </div>
                 <div class="form-control">
@@ -2161,6 +2297,51 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                         Copy Script<span class="material-symbols-outlined">terminal</span>
                     </button>
                 </div>
+                <h2>WARP PRO SETTINGS ⚙️</h2>
+                <div class="form-control">
+					<label for="hiddifyNoiseMode">😵‍💫 Hiddify Mode</label>
+					<input type="text" id="hiddifyNoiseMode" name="hiddifyNoiseMode" 
+                        pattern="^(m[1-6]|h_[0-9A-Fa-f]{2}|g_([0-9A-Fa-f]{2}_){2}[0-9A-Fa-f]{2})$" 
+                        title="Enter 'm1-m6', 'h_HEX', 'g_HEX_HEX_HEX' which HEX can be between 00 to ff"
+                        value="${hiddifyNoiseMode}" required>
+				</div>
+                <div class="form-control">
+					<label for="nikaNGNoiseMode">😵‍💫 NikaNG Mode</label>
+					<input type="text" id="nikaNGNoiseMode" name="nikaNGNoiseMode" 
+                        pattern="^(none|quic|random|[0-9A-Fa-f]+)$" 
+                        title="Enter 'none', 'quic', 'random', or any HEX string like 'ee0000000108aaaa'"
+                        value="${nikaNGNoiseMode}" required>
+				</div>
+                <div class="form-control">
+					<label for="noiseCountMin">🎚️ Noise Count</label>
+					<div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline;">
+						<input type="number" id="noiseCountMin" name="noiseCountMin"
+    						value="${noiseCountMin}" required>
+						<span style="text-align: center; white-space: pre;"> - </span>
+						<input type="number" id="noiseCountMax" name="noiseCountMax"
+    						value="${noiseCountMax}" required>
+					</div>
+				</div>
+                <div class="form-control">
+					<label for="noiseSizeMin">📏 Noise Size</label>
+					<div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline;">
+						<input type="number" id="noiseSizeMin" name="noiseSizeMin"
+    						value="${noiseSizeMin}" required>
+						<span style="text-align: center; white-space: pre;"> - </span>
+						<input type="number" id="noiseSizeMax" name="noiseSizeMax"
+    						value="${noiseSizeMax}" required>
+					</div>
+				</div>
+                <div class="form-control">
+					<label for="noiseDelayMin">🕞 Noise Delay</label>
+					<div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline;">
+						<input type="number" id="noiseDelayMin" name="noiseDelayMin"
+    						value="${noiseDelayMin}" required>
+						<span style="text-align: center; white-space: pre;"> - </span>
+						<input type="number" id="noiseDelayMax" name="noiseDelayMax"
+    						value="${noiseDelayMax}" required>
+					</div>
+				</div>
 				<div id="apply" class="form-control">
 					<div style="grid-column: 2; width: 100%;">
 						<input type="submit" id="applyButton" class="button disabled" value="APPLY SETTINGS 💥" form="configForm">
@@ -2168,7 +2349,7 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
 				</div>
 			</form>
             <hr>            
-			<h2>NORMAL CONFIGS 🔗</h2>
+			<h2>NORMAL CONFIGS SUB 🔗</h2>
 			<div class="table-container">
 				<table id="normal-configs-table">
 					<tr>
@@ -2183,7 +2364,19 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                             </div>
                             <div>
                                 <span class="material-symbols-outlined symbol">verified</span>
+                                <span>NikaNG</span>
+                            </div>
+                            <div>
+                                <span class="material-symbols-outlined symbol">verified</span>
+                                <span>MahsaNG</span>
+                            </div>
+                            <div>
+                                <span class="material-symbols-outlined symbol">verified</span>
                                 <span>v2rayN</span>
+                            </div>
+                            <div>
+                                <span class="material-symbols-outlined symbol">verified</span>
+                                <span>v2rayN-PRO</span>
                             </div>
                             <div>
                                 <span class="material-symbols-outlined symbol">verified</span>
@@ -2265,11 +2458,19 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                             </div>
                             <div>
                                 <span class="material-symbols-outlined symbol">verified</span>
-                                <span>v2rayN</span>
+                                <span>NikaNG</span>
                             </div>
                             <div>
                                 <span class="material-symbols-outlined symbol">verified</span>
                                 <span>MahsaNG</span>
+                            </div>
+                            <div>
+                                <span class="material-symbols-outlined symbol">verified</span>
+                                <span>v2rayN</span>
+                            </div>
+                            <div>
+                                <span class="material-symbols-outlined symbol">verified</span>
+                                <span>v2rayN-PRO</span>
                             </div>
                             <div>
                                 <span class="material-symbols-outlined symbol">verified</span>
@@ -2302,11 +2503,15 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                             </div>
                             <div>
                                 <span class="material-symbols-outlined symbol">verified</span>
-                                <span>v2rayN</span>
+                                <span>MahsaNG</span>
                             </div>
                             <div>
                                 <span class="material-symbols-outlined symbol">verified</span>
-                                <span>MahsaNG</span>
+                                <span>NikaNG</span>
+                            </div>
+                            <div>
+                                <span class="material-symbols-outlined symbol">verified</span>
+                                <span>v2rayN</span>
                             </div>
                             <div>
                                 <span class="material-symbols-outlined symbol">verified</span>
@@ -2337,7 +2542,52 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                             <button onclick="openQR('sing-box://import-remote-profile?url=https://${hostName}/warpsub/${userID}?app=singbox#asali-Warp', 'Warp Subscription')" style="margin-bottom: 8px;">
                                 QR Code&nbsp;<span class="material-symbols-outlined">qr_code</span>
                             </button>
-                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}?app=singbox#asali-Warp', false)">
+                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}?app=singbox#BPB-Warp', false)">
+                                Copy Sub<span class="material-symbols-outlined">format_list_bulleted</span>
+                            </button>
+						</td>
+					</tr>
+				</table>
+			</div>
+            <h2>WARP PRO SUB 🔗</h2>
+			<div class="table-container">
+				<table id="warp-pro-configs-table">
+					<tr>
+						<th>Application</th>
+						<th>Subscription</th>
+					</tr>
+					<tr>
+                        <td>
+                            <div>
+                                <span class="material-symbols-outlined symbol">verified</span>
+                                <span>NikaNG</span>
+                            </div>
+                            <div>
+                                <span class="material-symbols-outlined symbol">verified</span>
+                                <span>v2rayN-PRO</span>
+                            </div>
+                        </td>
+						<td>
+                            <button onclick="openQR('https://${hostName}/warpsub/${userID}?app=nikang#BPB-Warp-Pro', 'Warp Pro Subscription')" style="margin-bottom: 8px;">
+                                QR Code&nbsp;<span class="material-symbols-outlined">qr_code</span>
+                            </button>
+                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}?app=nikang#BPB-Warp-Pro', false)">
+                                Copy Sub<span class="material-symbols-outlined">format_list_bulleted</span>
+                            </button>
+                        </td>
+					</tr>
+					<tr>
+                        <td>
+                            <div>
+                                <span class="material-symbols-outlined symbol">verified</span>
+                                <span>Hiddify</span>
+                            </div>
+                        </td>
+						<td>
+                            <button onclick="openQR('sing-box://import-remote-profile?url=https://${hostName}/warpsub/${userID}?app=hiddify#BPB-Warp-Pro', 'Warp Pro Subscription')" style="margin-bottom: 8px;">
+                                QR Code&nbsp;<span class="material-symbols-outlined">qr_code</span>
+                            </button>
+                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}?app=hiddify#BPB-Warp-Pro', false)">
                                 Copy Sub<span class="material-symbols-outlined">format_list_bulleted</span>
                             </button>
 						</td>
@@ -2511,15 +2761,15 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                     credentials: 'include'
                 });
 
+                document.body.style.cursor = 'default';
+                refreshBtn.innerHTML = refreshButtonVal;
                 if (response.ok) {
-                    document.body.style.cursor = 'default';
-                    refreshBtn.innerHTML = refreshButtonVal;
-                    alert('Warp configs updated successfully! 😎');
+                    ${isWarpPlus} ? alert('Warp configs upgraded to PLUS successfully! 😎') : alert('Warp configs updated successfully! 😎');
                 } else {
                     const errorMessage = await response.text();
                     console.error(errorMessage, response.status);
-                    alert('⚠️ An error occured, Please try again!');
-                }           
+                    alert('⚠️ An error occured, Please try again!\\n⛔ ' + errorMessage);
+                }         
             } catch (error) {
                 console.error('Error:', error);
             } 
