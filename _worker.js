@@ -7,7 +7,7 @@ import { connect } from 'cloudflare:sockets';
 
 // How to generate your own UUID:
 // https://www.uuidgenerator.net/
-let userID = 'e5a22b18-1df4-49fb-a7b4-f859b39ed9e4';
+let userID = '89b3cbba-e6ac-485a-9481-976a0415eab9';
 
 // https://www.nslookup.io/domains/bpb.yousef.isegaro.com/dns-records/
 const proxyIPs = ['bpb.yousef.isegaro.com'];
@@ -1087,7 +1087,6 @@ const getFragmentConfigs = async (env, hostName, client) => {
             fragConfig.dns = await buildDNSObject(remoteDNS, localDNS, blockAds, bypassIran, blockPorn);
             fragConfig.outbounds[0].settings.fragment.length = `${lengthMin}-${lengthMax}`;
             fragConfig.outbounds[0].settings.fragment.interval = `${intervalMin}-${intervalMax}`;
-
             fragConfig.outbounds[0].settings.fragment.packets = fragmentPackets;
 
             if (proxyOutbound) {
@@ -1279,8 +1278,8 @@ const getWarpConfigs = async (env, client) => {
     const { xray: xrayWarpOutbounds, singbox: singboxWarpOutbounds } = await buildWarpOutbounds(env, client, remoteDNS, localDNS, blockAds, bypassIran, blockPorn, bypassLAN, warpEndpoints)
     const { xray: xrayWoWOutbounds, singbox: singboxWoWOutbounds } = await buildWoWOutbounds(env, client, remoteDNS, localDNS, blockAds, bypassIran, blockPorn, bypassLAN, wowEndpoint);
 
-    singboxWarpConfig.outbounds[0].outbounds = ['💦 Warp Best Ping 🚀'];
-    singboxWarpConfig.outbounds[1].tag = '💦 Warp Best Ping 🚀';
+    singboxWarpConfig.outbounds[0].outbounds = ['🍯 Warp Best Ping 🚀'];
+    singboxWarpConfig.outbounds[1].tag = '🍯 Warp Best Ping 🚀';
     xrayWarpConfig.dns = await buildDNSObject(remoteDNS, localDNS, blockAds, bypassIran, blockPorn);
     xrayWarpConfig.routing.rules = buildRoutingRules(localDNS, blockAds, bypassIran, blockPorn, bypassLAN, false, false);
     xrayWarpConfig.outbounds.splice(0, 1);
@@ -1337,8 +1336,6 @@ const getWarpConfigs = async (env, client) => {
 
     singboxWarpConfig.dns.rules[0].domain = [...new Set(outboundDomains)];
 
-    return client === 'singbox'
-        ? singboxWarpConfig
     return client === 'singbox' || client === 'hiddify'
         ? singboxWarpConfig
         : xrayWarpConfigs;
@@ -1355,8 +1352,8 @@ const buildWarpOutbounds = async (env, client, remoteDNS, localDNS, blockAds, by
     const portRegex = /[^:]*$/;
 
     try {
-        warpConfigs = await env.bpb.get('warpConfigs', { type: 'json' });
-        proxySettings = await env.bpb.get('proxySettings', { type: 'json' });
+        warpConfigs = await env.asali.get('warpConfigs', { type: 'json' });
+        proxySettings = await env.asali.get('proxySettings', { type: 'json' });
     } catch (error) {
         console.log(error);
         throw new Error(`An error occurred while getting warp configs - ${error}`);
@@ -1426,8 +1423,8 @@ const buildWoWOutbounds = async (env, client, remoteDNS, localDNS, blockAds, byp
     const portRegex = /[^:]*$/;
 
     try {
-        warpConfigs = await env.bpb.get('warpConfigs', { type: 'json' });
-        proxySettings = await env.bpb.get('proxySettings', { type: 'json' });
+        warpConfigs = await env.asali.get('warpConfigs', { type: 'json' });
+        proxySettings = await env.asali.get('proxySettings', { type: 'json' });
     } catch (error) {
         console.log(error);
         throw new Error(`An error occurred while getting warp configs - ${error}`);
@@ -1447,8 +1444,6 @@ const buildWoWOutbounds = async (env, client, remoteDNS, localDNS, blockAds, byp
             xrayOutbound.settings.peers[0].publicKey = warpConfigs[i].account.config.peers[0].public_key;
             xrayOutbound.settings.reserved = base64ToDecimal(warpConfigs[i].account.config.client_id);
             xrayOutbound.settings.secretKey = warpConfigs[i].privateKey;
-            xrayOutbound.tag = i === 1 ? `warp-ir_${index + 1}` : `warp-out_${index + 1}`;
-
 
             if (client === 'nikang' && i === 1) xrayOutbound.settings = {
                 ...xrayOutbound.settings,
@@ -1487,7 +1482,7 @@ const buildWoWOutbounds = async (env, client, remoteDNS, localDNS, blockAds, byp
                 fake_packets_delay: `${proxySettings.noiseDelayMin}-${proxySettings.noiseDelayMax}`
             };
 
-            singboxOutbound.tag = i === 1 ? `warp-ir_${index + 1}` : `💦 WoW ${index + 1} 🌍`;
+            singboxOutbound.tag = i === 1 ? `warp-ir_${index + 1}` : `🍯 WoW ${index + 1} 🌍`;
 
             if (i === 0) {
                 singboxOutbound.detour = `warp-ir_${index + 1}`;
@@ -1509,7 +1504,7 @@ const fetchWgConfig = async (env, warpKeys) => {
     const apiBaseUrl = 'https://api.cloudflareclient.com/v0a4005/reg';
 
     try {
-        proxySettings = await env.bpb.get('proxySettings', { type: 'json' });
+        proxySettings = await env.asali.get('proxySettings', { type: 'json' });
     } catch (error) {
         console.log(error);
         throw new Error(`An error occurred while getting warp configs - ${error}`);
@@ -1518,25 +1513,23 @@ const fetchWgConfig = async (env, warpKeys) => {
     const { warpPlusLicense } = proxySettings;
 
     for (let i = 0; i < 2; i++) {
-        const accountResponse = await fetch('https://api.cloudflareclient.com/v0a4005/reg', {
-            for(let i = 0; i< 2; i++) {
-                const accountResponse = await fetch(apiBaseUrl, {
-                    method: 'POST',
-                    headers: {
-                        'User-Agent': 'insomnia/8.6.1',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        key: warpKeys[i].publicKey,
-                        install_id: "",
-                        fcm_token: "",
-                        tos: new Date().toISOString(),
-                        type: "Android",
-                        model: 'PC',
-                        locale: 'en_US',
-                        warp_enabled: true
-                    })
-                });
+        const accountResponse = await fetch(apiBaseUrl, {
+            method: 'POST',
+            headers: {
+                'User-Agent': 'insomnia/8.6.1',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                key: warpKeys[i].publicKey,
+                install_id: "",
+                fcm_token: "",
+                tos: new Date().toISOString(),
+                type: "Android",
+                model: 'PC',
+                locale: 'en_US',
+                warp_enabled: true
+            })
+        });
 
         const accountData = await accountResponse.json();
         warpConfigs.push({
@@ -1570,7 +1563,7 @@ const fetchWgConfig = async (env, warpKeys) => {
         }
     }
 
-    await env.bpb.put('warpConfigs', JSON.stringify(warpConfigs));
+    await env.asali.put('warpConfigs', JSON.stringify(warpConfigs));
 }
 
 const buildDNSObject = async (remoteDNS, localDNS, blockAds, bypassIran, blockPorn, isWorkerLess) => {
@@ -1868,13 +1861,6 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
         lengthMax,
         intervalMin,
         intervalMax,
-        blockAds,
-        remoteDNS,
-        localDNS,
-        lengthMin,
-        lengthMax,
-        intervalMin,
-        intervalMax,
         fragmentPackets,
         blockAds,
         bypassIran,
@@ -1950,7 +1936,7 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Asali Worker Panel ${panelVersion}</title>
+        <title>Asali Panel ${panelVersion}</title>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 		<style>
@@ -2167,7 +2153,7 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
 	</head>
 	
 	<body>
-		<h1>Asali Worker Panel <span style="font-size: smaller;">${panelVersion}</span> 🍯</h1>
+		<h1>Asali BPB Panel <span style="font-size: smaller;">${panelVersion}</span> 🍯</h1>
 		<div class="form-container">
             <h2>FRAGMENT SETTINGS ⚙️</h2>
 			<form id="configForm">
@@ -2433,7 +2419,7 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                             </div>
                         </td>
                         <td>
-                            <button onclick="openQR('sing-box://import-remote-profile?url=https://${hostName}/sub/${userID}?app=sfa#Aasali-Normal', 'Normal Subscription')" style="margin-bottom: 8px;">
+                            <button onclick="openQR('sing-box://import-remote-profile?url=https://${hostName}/sub/${userID}?app=sfa#Asali-Normal', 'Normal Subscription')" style="margin-bottom: 8px;">
                                 QR Code&nbsp;<span class="material-symbols-outlined">qr_code</span>
                             </button>
                             <button onclick="copyToClipboard('https://${hostName}/sub/${userID}?app=sfa#Asali-Normal', false)">
@@ -2481,7 +2467,7 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                             <button onclick="openQR('https://${hostName}/fragsub/${userID}#Asali Fragment', 'Fragment Subscription')" style="margin-bottom: 8px;">
                                 QR Code&nbsp;<span class="material-symbols-outlined">qr_code</span>
                             </button>
-                            <button onclick="copyToClipboard('https://${hostName}/fragsub/${userID}#asali Fragment', true)">
+                            <button onclick="copyToClipboard('https://${hostName}/fragsub/${userID}#Asali Fragment', true)">
                                 Copy Sub<span class="material-symbols-outlined">format_list_bulleted</span>
                             </button>
                         </td>
@@ -2519,10 +2505,10 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                             </div>
                         </td>
 						<td>
-                            <button onclick="openQR('https://${hostName}/warpsub/${userID}#asali-Warp', 'Warp Subscription')" style="margin-bottom: 8px;">
+                            <button onclick="openQR('https://${hostName}/warpsub/${userID}#Asali-Warp', 'Warp Subscription')" style="margin-bottom: 8px;">
                                 QR Code&nbsp;<span class="material-symbols-outlined">qr_code</span>
                             </button>
-                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}#asali-Warp', false)">
+                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}#Asali-Warp', false)">
                                 Copy Sub<span class="material-symbols-outlined">format_list_bulleted</span>
                             </button>
                         </td>
@@ -2539,10 +2525,10 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                             </div>
                         </td>
 						<td>
-                            <button onclick="openQR('sing-box://import-remote-profile?url=https://${hostName}/warpsub/${userID}?app=singbox#asali-Warp', 'Warp Subscription')" style="margin-bottom: 8px;">
+                            <button onclick="openQR('sing-box://import-remote-profile?url=https://${hostName}/warpsub/${userID}?app=singbox#Asali-Warp', 'Warp Subscription')" style="margin-bottom: 8px;">
                                 QR Code&nbsp;<span class="material-symbols-outlined">qr_code</span>
                             </button>
-                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}?app=singbox#BPB-Warp', false)">
+                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}?app=singbox#Asali-Warp', false)">
                                 Copy Sub<span class="material-symbols-outlined">format_list_bulleted</span>
                             </button>
 						</td>
@@ -2568,10 +2554,10 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                             </div>
                         </td>
 						<td>
-                            <button onclick="openQR('https://${hostName}/warpsub/${userID}?app=nikang#BPB-Warp-Pro', 'Warp Pro Subscription')" style="margin-bottom: 8px;">
+                            <button onclick="openQR('https://${hostName}/warpsub/${userID}?app=nikang#Asali-Warp-Pro', 'Warp Pro Subscription')" style="margin-bottom: 8px;">
                                 QR Code&nbsp;<span class="material-symbols-outlined">qr_code</span>
                             </button>
-                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}?app=nikang#BPB-Warp-Pro', false)">
+                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}?app=nikang#Asali-Warp-Pro', false)">
                                 Copy Sub<span class="material-symbols-outlined">format_list_bulleted</span>
                             </button>
                         </td>
@@ -2584,10 +2570,10 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
                             </div>
                         </td>
 						<td>
-                            <button onclick="openQR('sing-box://import-remote-profile?url=https://${hostName}/warpsub/${userID}?app=hiddify#BPB-Warp-Pro', 'Warp Pro Subscription')" style="margin-bottom: 8px;">
+                            <button onclick="openQR('sing-box://import-remote-profile?url=https://${hostName}/warpsub/${userID}?app=hiddify#Asali-Warp-Pro', 'Warp Pro Subscription')" style="margin-bottom: 8px;">
                                 QR Code&nbsp;<span class="material-symbols-outlined">qr_code</span>
                             </button>
-                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}?app=hiddify#BPB-Warp-Pro', false)">
+                            <button onclick="copyToClipboard('https://${hostName}/warpsub/${userID}?app=hiddify#Asali-Warp-Pro', false)">
                                 Copy Sub<span class="material-symbols-outlined">format_list_bulleted</span>
                             </button>
 						</td>
@@ -2634,7 +2620,7 @@ const renderHomePage = async (env, hostName, fragConfigs) => {
             <hr>
             <div class="footer">
                 <i class="fa fa-github" style="font-size:36px; margin-right: 10px;"></i>
-                <a class="link" href="https://github.com/bia-pain-bache/Asali-Worker-Panel" target="_blank">Github</a>
+                <a class="link" href="https://github.com/bia-pain-bache/BPB-Worker-Panel" target="_blank">Github</a>
                 <button id="openModalBtn" class="button">Change Password</button>
                 <button type="button" id="logout" style="background: none; margin: 0; border: none; cursor: pointer;">
                     <i class="fa fa-power-off fa-2x" aria-hidden="true"></i>
@@ -3071,7 +3057,7 @@ const renderLoginPage = async () => {
     </head>
     <body>
         <div class="container">
-            <h1>Asali Panel <span style="font-size: smaller;">${panelVersion}</span> 🍯</h1>
+            <h1>Asali BPB Panel <span style="font-size: smaller;">${panelVersion}</span> 🍯</h1>
             <div class="form-container">
                 <h2>User Login</h2>
                 <form id="loginForm">
@@ -3142,10 +3128,10 @@ const renderErrorPage = (message, error, refer) => {
 
     <body>
         <div id="error-container">
-            <h1>Asali Panel <span style="font-size: smaller;">${panelVersion}</span> 🍯</h1>
+            <h1>Asali BPB Panel <span style="font-size: smaller;">${panelVersion}</span> 🍯</h1>
             <div id="error-message">
                 <h2>${message} ${refer
-            ? 'Please try again or refer to <a href="https://github.com/bia-pain-bache/Asali-Worker-Panel/blob/main/README.md">documents</a>'
+            ? 'Please try again or refer to <a href="https://github.com/bia-pain-bache/BPB-Worker-Panel/blob/main/README.md">documents</a>'
             : ''}
                 </h2>
                 <p><b>${error ? `⚠️ ${error}` : ''}</b></p>
